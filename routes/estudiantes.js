@@ -18,14 +18,50 @@ const db = admin.firestore();
 const estudiantesCollection = db.collection('estudiantes');
 
 
+/* =====> Login <======== */
+router.post('/login', async(req, res) => {
+   const { usuario, password } = req.body;
+   const findUser = await estudiantesCollection.where('usuario', '==', usuario).get();
+   
+   if(findUser.empty) {
+      return res.status(400).json({
+         error: 'El usuario no existe!!'
+      });
+   }
+
+   // El hecho de que se genere doc, es porque si encontro la variable 
+   const userDoc = findUser.docs[0];
+   const user = userDoc.data()
+
+   // Validamos si la contraseña que mandamos es la misma que esta en la BD.
+   const validarPassword = await bycrypt.compare(password, user.password); 
+   // Aunque el pass este encriptado compara (Primera letra que escribimos en el form | contraseña de la BD encriptada)
+
+   if(!validarPassword) {
+      return res.status(400).json({
+         error: 'Contraseña Inválida!!'
+      });
+    }
+
+   /* ====> Generacion de Token <==== */
+   const token = generateToken({
+      id: userDoc.id,
+      usuario: user.usuario
+   })
+   res.status(201).json({
+      token
+   })
+})
+
 /* Middleware (Token)*/
 function authToken(req, res, next) {
-   const authHeader = req.headers('autorization');
+   const authHeader = req.header('Authorization');
+  //  const authHeader = req.header.authorization;
    // Validamos si recibio token:
-   const token = authHeader && authHeader.split('')[1];
+   const token = authHeader && authHeader.split(' ')[1];
 
    if(!token) {
-      return res.status(401)({ message: 'No Autorizado'})
+      return res.status(401).json({ message: 'No Autorizado'})
    }
 
    try {
@@ -39,7 +75,7 @@ function authToken(req, res, next) {
 
 
 /* Endpoint para crear estudiantes */
-router.post('/create', async(req, res) => {
+router.post('/create', authToken, async(req, res) => {
    // Obtenemos parametros del body, asignandolos a las sig constantes:
    const { nombre, apaterno, amaterno, direccion, 
       telefono, correo, usuario, password} = req.body
@@ -70,6 +106,7 @@ router.post('/create', async(req, res) => {
       direccion,
       telefono,
       correo,
+      usuario,
       password: passHash 
    });
 
@@ -80,7 +117,7 @@ router.post('/create', async(req, res) => {
 });
 
 /* Endpoint para obtener usuarios: */
-router.get('/usuarios', async (req, res) => {
+router.get('/usuarios', authToken, async (req, res) => {
    try {
       // Obtenemos la coleccion 
       const coleccionUsuarios = await estudiantesCollection.get();
@@ -89,7 +126,7 @@ router.get('/usuarios', async (req, res) => {
       ...row.data()
    }));
    res.status(200).json({
-      message: 'Success, users found:',
+      message: 'success',
       usuarios
    });
    } catch (error) {
@@ -101,7 +138,7 @@ router.get('/usuarios', async (req, res) => {
 
 
 /* Endpoint para obtener usuarios por ID: */
-router.get('/estudiante_id/:id', async (req, res) => {
+router.get('/estudiante_id/:id', authToken, async (req, res) => {
    // Obtenemos la coleccion 
    const id = req.params.id; // Obtenemos el ID del parámetro de la URL
    const coleccionUsuarios = await estudiantesCollection.doc(id).get(); // .doc para ir al documento y obtener el id
@@ -121,7 +158,7 @@ router.get('/estudiante_id/:id', async (req, res) => {
 });
 
 /* Endpoint para actualizar usuarios por ID: */
-router.put('/update_study/:id', async(req, res) =>{
+router.put('/update_study/:id', authToken, async(req, res) =>{
    // Desde el front se manda el objeto con la informacion actualizada! Para que se sust en la db
    try {
       const id_url = req.params.id;
@@ -141,7 +178,7 @@ router.put('/update_study/:id', async(req, res) =>{
 });
 
 /* Endpoint para eliminar usuarios: */
-router.delete('/delete_study/:id', async(req, res) => {
+router.delete('/delete_study/:id', authToken, async(req, res) => {
    try {
       const id_url = req.params.id; // Obtenemos el ID por el parametro de la URL.
       const collEstuDelete = await estudiantesCollection.doc(id_url).delete(); // Obtenemos el doc corresp al ID

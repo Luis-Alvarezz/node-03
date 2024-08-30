@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 const top_secret = 'secretpassword';
 
 // Generacion de Token con vida de 10 dias
-export function generateToken (payload) {
+export function generateToken(payload) {
    return jwt.sign(payload, top_secret, { expiresIn: '10d'});
 }
 
